@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SlidingPuzzleApp.Views.SlidePuzzlePage">
+    <ContentPage.Content>
+        <StackLayout>
+            <Grid x:Name="puzzleGrid">
+                <!--puzzle grid-->
+                <!--TODO make dynamic-->
+                <Frame Grid.Row="0" Grid.Column="0">
+                    <ImageButton Source="{Binding ImageA1}" Command="{Binding SwapImage}" CommandParameter="A1"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="0" Grid.Column="1">
+                    <ImageButton Source="{Binding ImageA2}" Command="{Binding SwapImage}" CommandParameter="A2"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="0" Grid.Column="2">
+                    <ImageButton Source="{Binding ImageA3}" Command="{Binding SwapImage}" CommandParameter="A3"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="1" Grid.Column="0">
+                    <ImageButton Source="{Binding ImageB1}" Command="{Binding SwapImage}" CommandParameter="B1"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="1" Grid.Column="1">
+                    <ImageButton Source="{Binding ImageB2}" Command="{Binding SwapImage}" CommandParameter="B2"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="1" Grid.Column="2">
+                    <ImageButton Source="{Binding ImageB3}" Command="{Binding SwapImage}" CommandParameter="B3"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="2" Grid.Column="0">
+                    <ImageButton Source="{Binding ImageC1}" Command="{Binding SwapImage}" CommandParameter="C1"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="2" Grid.Column="1">
+                    <ImageButton Source="{Binding ImageC2}" Command="{Binding SwapImage}" CommandParameter="C2"></ImageButton>
+                </Frame>
+                <Frame Grid.Row="2" Grid.Column="2">
+                    <ImageButton Source="{Binding ImageC3}" Command="{Binding SwapImage}" CommandParameter="C3"></ImageButton>
+                </Frame>
+            </Grid>
+            <Label Text="{Binding MoveText}" HorizontalOptions="CenterAndExpand"></Label>
+            <Label Text="{Binding MinimumSteps}" HorizontalOptions="CenterAndExpand"></Label>
+            <Button Text="Find minimum steps" Command="{Binding SendSolveRecursive}"/>
+            <Button Text="Go Back" Command="{Binding SendGoBack}"/>
+        </StackLayout>
+    </ContentPage.Content>
+</ContentPage>
