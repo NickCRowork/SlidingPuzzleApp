@@ -30,6 +30,8 @@ namespace SlidingPuzzleApp.ViewModels
         public string MoveText { get => moveText; set => SetProperty(ref moveText, value); }
         private string minimumSteps;
         public string MinimumSteps { get => minimumSteps; set => SetProperty(ref minimumSteps, value); }
+        private string timeTaken;
+        public string TimeTaken { get => timeTaken; set => SetProperty(ref timeTaken, value); }
         public Command SendGoBack { get; }
         public Command SwapImage { get; }
         public Command SendSolveRecursive { get; }
@@ -38,12 +40,13 @@ namespace SlidingPuzzleApp.ViewModels
         private List<string> swappable;
         private string[] answer;
         private int movesTaken = 0;
+        private List<(int, long)> stepsToTime; 
 
         public SlidePuzzleViewModel()
         {
             SendGoBack = new Command(GoBack);
             SwapImage = new Command<string>(PerformImageSwap);
-            SendSolveRecursive = new Command(CountRecursiveStepsToSolve);
+            SendSolveRecursive = new Command(CountBFSStepsToSolve);
             swappable = new List<string>();
             answer = new string[] { "blue.png", "brown.png", "pink.png", "green.png", "orange.png", "gray.png", "purple.png", "red.png", "yellow.png" };
             currentEmpty = "ImageA3";
@@ -56,6 +59,7 @@ namespace SlidingPuzzleApp.ViewModels
             ImageC1 = "purple.png";
             ImageC2 = "red.png";
             ImageC3 = "yellow.png";
+            stepsToTime = new List<(int, long)>();
 
             SetSwappable();
             SetMoveText();
@@ -84,6 +88,31 @@ namespace SlidingPuzzleApp.ViewModels
             {
                 MoveText = "Solved!";
                 swappable.Clear();
+                return true;
+            }
+            return false;
+        }
+
+        private bool CheckAnswer(string[] board, string[] answer)
+        {
+            if (Enumerable.SequenceEqual(board, answer))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        internal static bool CompareArray(int[] a, int[] b)
+        {
+            if(a.Length == b.Length)
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    if(a[i] != b[i])
+                    {
+                        return false;
+                    }
+                }
                 return true;
             }
             return false;
@@ -144,6 +173,56 @@ namespace SlidingPuzzleApp.ViewModels
          * -width if result not less than max value
         */
 
+        private void CountBFSStepsToSolve()
+        {
+            //Builds the board to work with
+            string[] currentBoard = new string[] { ImageA1, ImageA2, ImageA3, ImageB1, ImageB2, ImageB3, ImageC1, ImageC2, ImageC3 };
+            //Tells how wide the board is for vertical movement options
+            int width = 3;
+            //Indicates the value of the "blank" square that can be moved into
+            string blank = "gray.png";
+            int blankIndex = Array.FindIndex(currentBoard, s => s == blank);
+            int[] intBoard;
+            int[] intAnswer;
+            ChangeBoardsToInt(currentBoard, answer, blank, out intBoard, out intAnswer);
+
+            var watch = new System.Diagnostics.Stopwatch();
+            watch.Start();
+            StateNode solution = BreadthFirstSearch(intBoard, intAnswer, blankIndex, width);
+            watch.Stop();
+            if(solution != null)
+            {
+                MinimumSteps = "Minimum steps: " + solution.depth;
+                TimeTaken = "Steps: " + solution.depth + " Time: " + watch.ElapsedMilliseconds + "ms";
+                stepsToTime.Add((solution.depth, watch.ElapsedMilliseconds));
+            }
+            else
+            {
+                MinimumSteps = "Unsolvable";
+            }
+        }
+
+        private void ChangeBoardsToInt(string[] currentBoard, string[] answer, string blank, out int[] intBoard, out int[] intanswer)
+        {
+            intBoard = new int[currentBoard.Length];
+            intanswer = new int[answer.Length];
+            for(int i = 0; i < answer.Length; i++)
+            {
+                int blankUsed = 0;
+                string current = answer[i];
+                int boardIndex = Array.FindIndex(currentBoard, s => s == current);
+                if (current.Equals(blank))
+                {
+                    intanswer[i] = 0;
+                    blankUsed -= 1;
+                    intBoard[boardIndex] = 0;
+                    continue;
+                }
+                intanswer[i] = i + 1 + blankUsed;
+                intBoard[boardIndex] = i + 1 + blankUsed;
+            }
+        }
+
         /// <summary>
         /// Counts smallest number of steps that the sliding puzzle will take.
         /// Sends it to the property for minimum steps.
@@ -196,7 +275,7 @@ namespace SlidingPuzzleApp.ViewModels
                 int[] newSwappableIndices = GetSwappableIndices(index, width, newBoard.Length - 1);
                 //Score the new board for how close to complete it is
                 int score = ScoreAnswer(newBoard, answer, width, blank);
-                if (score < previousScore)
+                if (score <= previousScore)
                 {//If closer to completion
                     //Solve recursively
                     int result = SwapRecursive(steps + 1, index, currentIndex, newSwappableIndices, width, newBoard, answer, score, blank);
@@ -210,6 +289,101 @@ namespace SlidingPuzzleApp.ViewModels
             return -1;//Hit if no progress could be made
         }
 
+        private StateNode BreadthFirstSearch(int[] currentBoard, int[] answer, int emptyIndex, int width)
+        {
+            Queue<StateNode> frontier = new Queue<StateNode>();
+            HashSet<StateNode> explored = new HashSet<StateNode>();
+
+            StateNode currentNode = new StateNode(currentBoard, null, 0, 0, emptyIndex);
+
+            if(CompareArray(currentNode.board, answer))//O(n)
+            {
+                return currentNode;
+            }
+
+            frontier.Enqueue(currentNode);//O(1)
+
+            while(frontier.Count > 0)
+            {
+                currentNode = frontier.Dequeue();//O(1)
+                bool unique = explored.Add(currentNode);//O(1)
+                if (unique == false)
+                {
+                    continue;
+                }    
+
+                if (CompareArray(currentNode.board, answer))
+                {//O(n)
+                    return currentNode;
+                }
+
+                int[] swappableIndices = GetSwappableIndices(currentNode.EmptyIndex, width, currentBoard.Length - 1);//O(1)
+                foreach (int index in swappableIndices)
+                {//O(1)
+                    StateNode successor = new StateNode(Swap(currentNode.board, currentNode.EmptyIndex, index), currentNode, currentNode.depth + 1, 1, index);//O(n)
+                    frontier.Enqueue(successor);
+                }
+            }
+            return null;
+        }
+
+        private class StateNode
+        {
+            internal int[] board;
+            StateNode parent;
+            internal int depth;
+            internal int cost;
+            int emptyIndex;
+            int identifier;
+
+            internal int TotalCost
+            {
+                get
+                {
+                    if(parent == null)
+                    {
+                        return cost;
+                    }
+                    else
+                    {
+                        return parent.TotalCost + cost;
+                    }
+                }
+            }
+
+            internal int EmptyIndex
+            {
+                get
+                {
+                    return emptyIndex;
+                }
+            }
+
+            internal StateNode(int[] currentBoard, StateNode parent, int depth, int cost, int emptyIndex)
+            {
+                this.board = currentBoard;
+                this.parent = parent;
+                this.depth = depth;
+                this.cost = cost;
+                this.emptyIndex = emptyIndex;
+                int offset = 3;
+                for (int i = 0; i < currentBoard.Length; i++)
+                {
+                    identifier += i * (offset++) * currentBoard[i];
+                }
+            }
+
+            public override bool Equals(object obj)
+            {
+                return CompareArray((obj as StateNode).board, board);
+            }
+
+            public override int GetHashCode()
+            {
+                return identifier;
+            }
+        }
+
         /// <summary>
         /// Scores how close to completion the board is. Score == 0 is a completed board.
         /// </summary>
@@ -221,6 +395,7 @@ namespace SlidingPuzzleApp.ViewModels
         private int ScoreAnswer(string[] currentBoard, string[] answer, int width, string blank)
         {
             int score = 0;
+            int blankIndex = Array.FindIndex(currentBoard, s => s == blank);
             for (int i = 0; i < currentBoard.Length; i++)
             {//For every space pm the board
                 if (currentBoard[i] == blank)
@@ -231,7 +406,15 @@ namespace SlidingPuzzleApp.ViewModels
                 int difference = Math.Abs(Array.FindIndex(answer, s => s == currentBoard[i]) - i);
                 //Since the square can be moved vertically, it can be moved width indices at once
                 //That means that it is the difference / width + remainder away from desired position
-                score += (difference / width) + (difference % width);
+                difference = (difference / width) + (difference % width);
+                int baseScore = (int)Math.Pow(difference, 2f);
+
+                int blankDifference = Math.Abs(blankIndex - i);
+                blankDifference = (blankDifference / width) + (blankDifference % width);
+                blankDifference = blankDifference * difference;
+                baseScore = (baseScore + blankDifference + 1) / 2;
+
+                score += baseScore;
             }
             return score;
         }
@@ -253,6 +436,22 @@ namespace SlidingPuzzleApp.ViewModels
         }
 
         /// <summary>
+        /// Swaps indices a and b on the given board and returns a new board with the result.
+        /// </summary>
+        /// <param name="currentBoard">The board to perform the swap on.</param>
+        /// <param name="a">The first index to swap.</param>
+        /// <param name="b">The second index to swap.</param>
+        /// <returns>A new board with the indices swapped.</returns>
+        private int[] Swap(int[] currentBoard, int a, int b)
+        {
+            int[] newBoard = new int[currentBoard.Length];
+            Array.Copy(currentBoard, newBoard, currentBoard.Length);
+            newBoard[a] = currentBoard[b];
+            newBoard[b] = currentBoard[a];
+            return newBoard;
+        }
+
+        /// <summary>
         /// Returns the indices next to current index from a board with the given width.
         /// </summary>
         /// <param name="currentIndex">The space to return indices next to.</param>
@@ -262,13 +461,24 @@ namespace SlidingPuzzleApp.ViewModels
         private int[] GetSwappableIndices(int currentIndex, int width, int maxIndex)
         {
             List<int> indices = new List<int>();
-            if (currentIndex - 1 >= 0)
+            if (currentIndex - 1 >= 0 && currentIndex % width != 0)
             {
                 indices.Add(currentIndex - 1);
             }
             if (currentIndex + 1 <= maxIndex)
             {
-                indices.Add(currentIndex + 1);
+                bool canAdd = true;
+                for(int i = width - 1; i < maxIndex; i += width)
+                {
+                    if(currentIndex == i)
+                    {
+                        canAdd = false;
+                    }
+                }
+                if(canAdd)
+                {
+                    indices.Add(currentIndex + 1);
+                }
             }
             if (currentIndex - width >= 0)
             {

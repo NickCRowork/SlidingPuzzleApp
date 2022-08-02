@@ -37,6 +37,7 @@
             </Grid>
             <Label Text="{Binding MoveText}" HorizontalOptions="CenterAndExpand"></Label>
             <Label Text="{Binding MinimumSteps}" HorizontalOptions="CenterAndExpand"></Label>
+            <Label Text="{Binding TimeTaken}" HorizontalOptions="CenterAndExpand"></Label>
             <Button Text="Find minimum steps" Command="{Binding SendSolveRecursive}"/>
             <Button Text="Go Back" Command="{Binding SendGoBack}"/>
         </StackLayout>
